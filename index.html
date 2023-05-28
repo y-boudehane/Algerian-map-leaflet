@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>Algerian map</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.1/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"
+        integrity="sha512-xodZBNTC5n17Xt2atTPuE1HxjVMSvLVW9ocqUKLsCC5CXdbqCmblAshOMAS6/keqq/sMZMZ19scR4PsZChSR7A=="
+        crossorigin="" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.4/jquery.min.js"
+        integrity="sha512-pumBsjNRGGqkPzKHndZMaAG+bir374sORyzM3uulLV14lN5LyykqNk8eEeUlUkB3U0M4FApyaHraT65ihJhDpQ=="
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"
+        integrity="sha512-XQoYMqMTK8LvdxXYG3nZ448hOEQiglfqkJs1NOQV44cWnUrBc8PkAOcXy20w0vlaXaVUearIOBhiXZ5V3ynxwA=="
+        crossorigin=""></script>
+    <style>
+        #map {
+            height: 600px;
+        }
+
+        /* Only the necessary CSS shown */
+        :root {
+            --map-tiles-filter: brightness(0.6) invert(1) contrast(3) hue-rotate(200deg) saturate(0.3) brightness(0.7);
+        }
+
+        .map-tiles {
+            filter: var(--map-tiles-filter, none);
+        }
+    </style>
+</head>
+
+<body>
+    <div id="map"></div>
+    <script>
+        //Init BaseMaps
+        var basemaps = {
+            OpenStreetMaps: L.tileLayer(
+                "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+                    minZoom: 2,
+                    maxZoom: 19,
+                    id: "osm.streets",
+                }
+            ),
+            OpenStreetMaps_dark: L.tileLayer(
+                "https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png", {
+                    className: "map-tiles",
+                }
+            ),
+            "Google-Map": L.tileLayer(
+                "https://mt1.google.com/vt/lyrs=r&x={x}&y={y}&z={z}", {
+                    minZoom: 2,
+                    maxZoom: 19,
+                    id: "google.street",
+                }
+            ),
+            "Google-Satellite": L.tileLayer(
+                "https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}", {
+                    minZoom: 2,
+                    maxZoom: 19,
+                    id: "google.satellite",
+                }
+            ),
+            "Google-Hybrid": L.tileLayer(
+                "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}", {
+                    minZoom: 2,
+                    maxZoom: 19,
+                    id: "google.hybrid",
+                }
+            ),
+        };
+        var map = L.map("map", {
+            attributionControl: false,
+            center: [28.285033, 1.911621],
+            zoom: 5,
+            layers: [basemaps.OpenStreetMaps],
+        });
+        L.control.layers(basemaps).addTo(map);
+
+        // loading GeoJSON file -
+        $.getJSON("geojson/wilayas.geojson", function (data) {
+            // L.geoJson function is used to parse geojson file and load on to map
+            layer_wilaya = L.geoJSON(data, {
+                style: function (feature) {
+                    $("#wilaya").append(
+                        new Option(
+                            feature.properties.code + " : " + feature.properties.name,
+                            feature.properties.code
+                        )
+                    );
+                    return {
+                    weight: 2,
+                    fillOpacity: 0.5,
+                    fillColor: "#0072cb",
+                    color: "white",
+                };
+                },
+                onEachFeature: function (feature, featureLayer) {
+                    featureLayer.on("mouseover", function () {
+                        this.setStyle({
+                            fillOpacity: 0.8,
+                        });
+                    });
+                    featureLayer.on("mouseout", function () {
+                        layer_wilaya.resetStyle(this);
+                    });
+                    featureLayer.bindTooltip(feature.properties.name, {
+                        className: "leaflet-tooltip-own",
+                        direction: "top",
+                    });
+                },
+            });
+            layer_wilaya.addTo(map);
+        });
+
+        L.Control.Button = L.Control.extend({
+            options: {
+                position: "topleft",
+            },
+            onAdd: function (map) {
+                var container = L.DomUtil.create(
+                    "div",
+                    "leaflet-bar leaflet-control form-group"
+                );
+                var select = L.DomUtil.create(
+                    "select",
+                    "leaflet-control-button form-select",
+                    container
+                );
+                select.id = "wilaya";
+                select.innerHTML += "<option>Choisir une wilaya</option>";
+                L.DomEvent.disableClickPropagation(select);
+                L.DomEvent.on(select, "change", function (e) {
+                    var value = e.target.value;
+                    map.eachLayer(function (layer) {
+                        if (layer.feature != null) {
+                            // check if this is the selected layer
+                            if (layer.feature.properties.code == value) {
+                                // set the layer style to highlight it
+                                layer.setStyle({
+                                    color: "black",
+                                    weight: 3,
+                                    fillColor: "orange",
+                                    fillOpacity: 0.6,
+                                });
+                                layer.openTooltip();
+                                layer.bringToFront();
+                            } else {
+                                layer.closeTooltip();
+                                // remove any previous highlighting
+                                layer.setStyle({
+                                    weight: 2,
+                                    fillOpacity: 0.8,
+                                    fillColor: "lightgray",
+                                    color: "black",
+                                });
+                            }
+                        }
+                    });
+                });
+
+                return container;
+            },
+            onRemove: function (map) {},
+        });
+        var control = new L.Control.Button();
+        control.addTo(map);
+    </script>
+</body>
+
+</html>
